@@ -1,0 +1,35 @@
+# Dependencies
+node_modules
+
+# Python
+**/venv
+__pycache__
+*.pyc
+
+# Next.js
+web/.next/
+web/out/
+web/dist/
+
+# Environment
+.env
+.env*.local
+!.env.example
+!.env.local.example
+
+# Agora CLI local project binding
+.agora/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Superpowers workflow docs (specs/plans) — local only, not tracked
+docs/superpowers/
