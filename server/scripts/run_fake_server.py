@@ -20,6 +20,9 @@ class FakeAgent:
             raise ValueError("agent_id is required")
         self.started_agent_ids.discard(agent_id)
 
+    async def close(self):
+        pass
+
 
 def main():
     server_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

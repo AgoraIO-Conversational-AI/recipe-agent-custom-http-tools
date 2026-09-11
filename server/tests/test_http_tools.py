@@ -63,6 +63,25 @@ def test_create_ticket_validates_body_and_returns_ticket(client):
         assert lookup.json() == body
 
 
+def test_create_ticket_does_not_overwrite_an_existing_ticket(client):
+    headers = {"X-Tool-API-Key": "test-tool-key"}
+    first = client.post(
+        "/tools/tickets",
+        headers=headers,
+        json={"order_id": "A-1000", "issue": "issue-54"},
+    ).json()
+    second = client.post(
+        "/tools/tickets",
+        headers=headers,
+        json={"order_id": "A-1000", "issue": "issue-132"},
+    ).json()
+
+    assert first["ticket_id"] != second["ticket_id"]
+    assert client.get(
+        f"/tools/tickets/{first['ticket_id']}", headers=headers
+    ).json() == first
+
+
 def test_lookup_ticket_returns_not_found_for_unknown_id(client):
     response = client.get(
         "/tools/tickets/T-UNKNOWN",

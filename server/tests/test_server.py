@@ -1,6 +1,24 @@
 """FastAPI route tests via TestClient + FakeAgent (no Agora cloud)."""
 
 
+def test_lifespan_closes_agent(server_module):
+    from fastapi.testclient import TestClient
+
+    class ClosingAgent:
+        def __init__(self):
+            self.closed = False
+
+        async def close(self):
+            self.closed = True
+
+    fake = ClosingAgent()
+    server_module.agent = fake
+    with TestClient(server_module.app):
+        pass
+
+    assert fake.closed is True
+
+
 def test_get_config_returns_envelope_and_token(client):
     response = client.get("/get_config")
     assert response.status_code == 200

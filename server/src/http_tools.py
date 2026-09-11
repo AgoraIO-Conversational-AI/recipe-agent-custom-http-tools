@@ -5,7 +5,6 @@ configuration. Engine makes the HTTP requests; these FastAPI routes are only a
 deterministic demo target and can be replaced with a business API.
 """
 
-import hashlib
 import hmac
 import logging
 import os
@@ -19,6 +18,19 @@ TOOL_API_KEY_HEADER = "X-Tool-API-Key"
 router = APIRouter(prefix="/tools", tags=["inline-rest-tools"])
 logger = logging.getLogger("uvicorn.error")
 _tickets: Dict[str, Dict[str, Any]] = {}
+_next_ticket_number = 1000
+
+
+def _allocate_ticket_id() -> str:
+    """Allocate an unused, voice-friendly ticket ID for this process."""
+    global _next_ticket_number
+
+    for _ in range(9000):
+        ticket_id = f"T-{_next_ticket_number}"
+        _next_ticket_number = 1000 if _next_ticket_number == 9999 else _next_ticket_number + 1
+        if ticket_id not in _tickets:
+            return ticket_id
+    raise HTTPException(status_code=503, detail="Ticket capacity reached")
 
 
 def _base_url(value: str) -> str:
@@ -185,8 +197,7 @@ async def create_support_ticket(
     issue = request.issue.strip()
     if not order_id or not issue:
         raise HTTPException(status_code=400, detail="order_id and issue are required")
-    digest = hashlib.sha256(f"{order_id}:{issue}".encode()).digest()
-    ticket_id = f"T-{1000 + int.from_bytes(digest[:4], 'big') % 9000}"
+    ticket_id = _allocate_ticket_id()
     ticket = {
         "ticket_id": ticket_id,
         "status": "created",

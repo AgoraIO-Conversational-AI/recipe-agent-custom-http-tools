@@ -34,6 +34,7 @@ class FakeAgent:
     def __init__(self):
         self.started = []
         self.stopped = []
+        self.closed = False
 
     async def start(self, channel_name, agent_uid, user_uid, output_audio_codec=None):
         self.started.append((channel_name, agent_uid, user_uid, output_audio_codec))
@@ -45,6 +46,9 @@ class FakeAgent:
 
     async def stop(self, agent_id):
         self.stopped.append(agent_id)
+
+    async def close(self):
+        self.closed = True
 
 
 @pytest.fixture
