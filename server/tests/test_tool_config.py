@@ -42,7 +42,11 @@ def test_builds_get_and_post_tools_with_supported_templates():
         "properties": {
             "ticket_id": {
                 "type": "string",
-                "description": "The ticket identifier returned when the ticket was created.",
+                "description": (
+                    "The ticket ID returned when the ticket was created, in T-1234 "
+                    "format. Normalize spoken input to this format, for example "
+                    "'T four eight two one' to 'T-4821'."
+                ),
             }
         },
         "required": ["ticket_id"],

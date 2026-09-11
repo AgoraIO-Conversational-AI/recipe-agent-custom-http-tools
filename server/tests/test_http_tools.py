@@ -39,6 +39,8 @@ def test_create_ticket_validates_body_and_returns_ticket(client):
     assert response.status_code == 200
     body = response.json()
     assert body["ticket_id"].startswith("T-")
+    assert len(body["ticket_id"]) == 6
+    assert body["ticket_id"][2:].isdigit()
     assert body["status"] == "created"
     assert body["order_id"] == "A-1001"
     assert body["issue"] == "The package is late"
@@ -51,6 +53,14 @@ def test_create_ticket_validates_body_and_returns_ticket(client):
     )
     assert lookup.status_code == 200
     assert lookup.json() == body
+
+    for spoken_variant in (body["ticket_id"].replace("-", ""), body["ticket_id"][2:]):
+        lookup = client.get(
+            f"/tools/tickets/{spoken_variant}",
+            headers={"X-Tool-API-Key": "test-tool-key"},
+        )
+        assert lookup.status_code == 200
+        assert lookup.json() == body
 
 
 def test_lookup_ticket_returns_not_found_for_unknown_id(client):

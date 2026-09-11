@@ -115,7 +115,9 @@ def build_inline_tools(
                         "ticket_id": {
                             "type": "string",
                             "description": (
-                                "The ticket identifier returned when the ticket was created."
+                                "The ticket ID returned when the ticket was created, in T-1234 "
+                                "format. Normalize spoken input to this format, for example "
+                                "'T four eight two one' to 'T-4821'."
                             ),
                         }
                     },
@@ -146,6 +148,16 @@ class TicketRequest(BaseModel):
     tool_call_id: Optional[str] = None
 
 
+def _normalize_ticket_id(value: str) -> str:
+    normalized = value.strip().upper().replace(" ", "")
+    digits = normalized[2:] if normalized.startswith("T-") else normalized
+    if digits.startswith("T"):
+        digits = digits[1:]
+    if len(digits) == 4 and digits.isdigit():
+        return f"T-{digits}"
+    return normalized
+
+
 @router.get("/orders/{order_id}")
 async def lookup_order(
     order_id: str,
@@ -173,9 +185,10 @@ async def create_support_ticket(
     issue = request.issue.strip()
     if not order_id or not issue:
         raise HTTPException(status_code=400, detail="order_id and issue are required")
-    digest = hashlib.sha256(f"{order_id}:{issue}".encode()).hexdigest()[:8].upper()
+    digest = hashlib.sha256(f"{order_id}:{issue}".encode()).digest()
+    ticket_id = f"T-{1000 + int.from_bytes(digest[:4], 'big') % 9000}"
     ticket = {
-        "ticket_id": f"T-{digest}",
+        "ticket_id": ticket_id,
         "status": "created",
         "order_id": order_id,
         "issue": issue,
@@ -196,7 +209,7 @@ async def get_support_ticket(
     x_tool_api_key: Optional[str] = Header(default=None, alias=TOOL_API_KEY_HEADER),
 ):
     _check_key(x_tool_api_key)
-    normalized = ticket_id.strip().upper()
+    normalized = _normalize_ticket_id(ticket_id)
     ticket = _tickets.get(normalized)
     if ticket is None:
         raise HTTPException(status_code=404, detail="Ticket not found")
