@@ -1,8 +1,8 @@
 # Architecture — Custom HTTP Tools Recipe
 
 This recipe demonstrates **inline LLM REST tools**, which are parallel to MCP
-and configured directly in `OpenAI.tools`. It uses the normal Agora voice
-cascade (Deepgram STT → managed OpenAI LLM → MiniMax TTS).
+and configured directly in `OpenAI.tools` or `OpenAIRealtime.tools`. It supports
+the normal Agora voice cascade and an OpenAI Realtime MLLM path.
 
 ```text
 Browser
@@ -17,12 +17,13 @@ Agora ConvoAI Engine
   ▼
 Business REST endpoint (public HTTPS)
   │  JSON result
-  └──────────────▶ Engine → LLM → TTS → RTC client
+  └──────────────▶ Engine → selected model path → RTC client
 ```
 
 ## Boundaries
 
-- `server/src/agent.py` builds the SDK agent, managed vendors, and tool list.
+- `server/src/agent.py` builds the selected Pipeline or Realtime SDK agent and
+  the shared tool list.
 - `server/src/http_tools.py` contains the tool schema builder and mock target
   routes. Its demo tickets live in process and can be queried until the backend
   restarts. The target routes can be replaced by a separate business service.
@@ -34,7 +35,8 @@ Business REST endpoint (public HTTPS)
 The SDK supports these placeholders in URLs and POST bodies:
 
 - `{{args.name}}` from the model function arguments
-- `{{template_variables.name}}` from the LLM configuration
+- `{{template_variables.name}}` from the Pipeline LLM configuration; Realtime
+  uses a literal `requester` because its SDK vendor has no such field
 - `{{tool_call_id}}` from the current call
 
 Headers accept constants, template variables, or the tool call ID. They do not

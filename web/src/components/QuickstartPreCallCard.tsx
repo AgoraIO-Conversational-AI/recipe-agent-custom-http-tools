@@ -3,16 +3,21 @@
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import type { AgentMode } from "@/types/conversation";
 
 type QuickstartPreCallCardProps = {
 	isLoading: boolean;
 	error: string | null;
+	agentMode: AgentMode;
+	onAgentModeChange: (mode: AgentMode) => void;
 	onStartConversation: () => void;
 };
 
 export function QuickstartPreCallCard({
 	isLoading,
 	error,
+	agentMode,
+	onAgentModeChange,
 	onStartConversation,
 }: QuickstartPreCallCardProps) {
 	return (
@@ -31,10 +36,33 @@ export function QuickstartPreCallCard({
 				selects a tool and Agora Engine calls your HTTP endpoint.
 			</p>
 
+			<fieldset disabled={isLoading} className="mt-8 w-full text-left">
+				<legend className="mb-3 text-sm font-medium text-white">
+					Agent mode
+				</legend>
+				<div className="grid grid-cols-2 gap-2">
+					{(["pipeline", "realtime"] as const).map((mode) => (
+						<label key={mode} className="cursor-pointer">
+							<input
+								type="radio"
+								name="agentMode"
+								value={mode}
+								checked={agentMode === mode}
+								onChange={() => onAgentModeChange(mode)}
+								className="peer sr-only"
+							/>
+							<span className="flex h-10 items-center justify-center rounded-lg border border-[#2b2b2b] text-sm text-muted-foreground transition-colors peer-checked:border-primary peer-checked:bg-primary/10 peer-checked:text-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background peer-disabled:cursor-not-allowed peer-disabled:opacity-50">
+								{mode === "pipeline" ? "Pipeline" : "Realtime"}
+							</span>
+						</label>
+					))}
+				</div>
+			</fieldset>
+
 			<Button
 				onClick={onStartConversation}
 				disabled={isLoading}
-				className="mt-12 h-10 w-full rounded-lg border border-primary bg-primary text-sm font-medium text-black hover:border-white hover:bg-white hover:text-black disabled:hover:border-primary disabled:hover:bg-primary disabled:hover:text-black"
+				className="mt-6 h-10 w-full rounded-lg border border-primary bg-primary text-sm font-medium text-black hover:border-white hover:bg-white hover:text-black disabled:hover:border-primary disabled:hover:bg-primary disabled:hover:text-black"
 				aria-label={
 					isLoading
 						? "Starting conversation with AI agent"

@@ -5,7 +5,7 @@ import os
 import random
 import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from dotenv import load_dotenv
 
@@ -80,6 +80,7 @@ class StartAgentRequest(BaseModel):
     rtcUid: int
     userUid: int
     parameters: Optional[Dict[str, Any]] = None
+    agentMode: Literal["pipeline", "realtime"] = "pipeline"
 
 
 class StopAgentRequest(BaseModel):
@@ -140,6 +141,7 @@ async def start_agent(request: StartAgentRequest):
             agent_uid=request.rtcUid,
             user_uid=request.userUid,
             output_audio_codec=codec,
+            agent_mode=request.agentMode,
         )
         return {"code": 0, "msg": "success", "data": result}
     except Exception as exc:

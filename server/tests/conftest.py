@@ -36,12 +36,22 @@ class FakeAgent:
         self.stopped = []
         self.closed = False
 
-    async def start(self, channel_name, agent_uid, user_uid, output_audio_codec=None):
-        self.started.append((channel_name, agent_uid, user_uid, output_audio_codec))
+    async def start(
+        self,
+        channel_name,
+        agent_uid,
+        user_uid,
+        output_audio_codec=None,
+        agent_mode="pipeline",
+    ):
+        self.started.append(
+            (channel_name, agent_uid, user_uid, output_audio_codec, agent_mode)
+        )
         return {
             "agent_id": f"fake-agent-{agent_uid}",
             "channel_name": channel_name,
             "status": "started",
+            "agent_mode": agent_mode,
         }
 
     async def stop(self, agent_id):

@@ -1,5 +1,7 @@
 "use client";
 
+import type { AgentMode } from "@/types/conversation";
+
 export type QuickstartAgentMetric = {
 	type: string;
 	name: string;
@@ -9,13 +11,23 @@ export type QuickstartAgentMetric = {
 
 type QuickstartPipelineMetricsProps = {
 	metrics: QuickstartAgentMetric[];
+	agentMode: AgentMode;
 };
 
-const PIPELINE = [
-	{ key: "stt", label: "Deepgram STT", metricTypes: ["stt", "asr"] },
-	{ key: "llm", label: "OpenAI LLM", metricTypes: ["llm", "mllm"] },
-	{ key: "tts", label: "MiniMax TTS", metricTypes: ["tts"] },
-] as const;
+const PIPELINES = {
+	pipeline: [
+		{ key: "stt", label: "Deepgram STT", metricTypes: ["stt", "asr"] },
+		{ key: "llm", label: "OpenAI LLM", metricTypes: ["llm"] },
+		{ key: "tts", label: "MiniMax TTS", metricTypes: ["tts"] },
+	],
+	realtime: [
+		{
+			key: "mllm",
+			label: "OpenAI Realtime MLLM",
+			metricTypes: ["mllm", "llm"],
+		},
+	],
+} as const;
 
 function formatMetricName(name: string) {
 	return name.replace(/[_-]+/g, " ");
@@ -23,7 +35,9 @@ function formatMetricName(name: string) {
 
 export function QuickstartPipelineMetrics({
 	metrics,
+	agentMode,
 }: QuickstartPipelineMetricsProps) {
+	const pipeline = PIPELINES[agentMode];
 	const latestByType = new Map<string, QuickstartAgentMetric>();
 	for (const metric of metrics) {
 		latestByType.set(metric.type.toLowerCase(), metric);
@@ -34,7 +48,7 @@ export function QuickstartPipelineMetrics({
 			<span className="text-sm font-medium leading-6 text-muted-foreground">
 				Pipeline
 			</span>
-			{PIPELINE.map((step, index) => {
+			{pipeline.map((step, index) => {
 				const metric = step.metricTypes
 					.map((type) => latestByType.get(type))
 					.find(Boolean);

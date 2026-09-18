@@ -34,15 +34,16 @@ test('getConfig hits /api/get_config with query and returns data', async () => {
 
 test('startAgent posts the payload and returns agent_id', async () => {
   mockFetch(200, { code: 0, msg: 'success', data: { agent_id: 'agent-1' } })
-  const id = await startAgent('ch', 111, 222)
+	const id = await startAgent('ch', 111, 222, 'realtime')
   expect(id).toBe('agent-1')
   expect(lastCall.url).toContain('/api/startAgent')
   expect(lastCall.init?.method).toBe('POST')
   expect(JSON.parse(String(lastCall.init?.body))).toEqual({
     channelName: 'ch',
     rtcUid: 111,
-    userUid: 222,
-  })
+		userUid: 222,
+		agentMode: 'realtime',
+	})
 })
 
 test('stopAgent posts the agentId', async () => {

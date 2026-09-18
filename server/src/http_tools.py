@@ -1,6 +1,6 @@
 """Inline REST tool definitions and their local demo endpoints.
 
-The tool definitions are sent to the Agora Engine as part of the managed LLM
+The tool definitions are sent to the Agora Engine as part of the LLM or MLLM
 configuration. Engine makes the HTTP requests; these FastAPI routes are only a
 deterministic demo target and can be replaced with a business API.
 """
@@ -51,6 +51,7 @@ def build_inline_tools(
     api_key: str,
     *,
     timeout_ms: int = 10000,
+    requester: str = "{{template_variables.requester}}",
 ) -> list[Dict[str, Any]]:
     """Build the SDK's public inline REST tool dictionary shape."""
     if not api_key:
@@ -110,7 +111,7 @@ def build_inline_tools(
                 "body": {
                     "order_id": "{{args.order_id}}",
                     "issue": "{{args.issue}}",
-                    "requester": "{{template_variables.requester}}",
+                    "requester": requester,
                     "tool_call_id": "{{tool_call_id}}",
                 },
                 "timeout_ms": timeout_ms,

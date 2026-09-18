@@ -1,8 +1,8 @@
 # Agent Development Guide
 
 This repository is the **custom HTTP tools** recipe. It shows Engine's inline
-synchronous HTTP tools configured on the managed OpenAI LLM, a capability that
-is separate from MCP.
+synchronous HTTP tools configured on either the managed OpenAI LLM or OpenAI
+Realtime MLLM, a capability that is separate from MCP.
 
 ## System shape
 
@@ -16,18 +16,21 @@ is separate from MCP.
 
 ## SDK contract
 
-`OpenAI.tools` is a list of dictionaries with `function` and `server` fields.
-The server method is `GET` or `POST`; the only execution mode currently
-supported is `sync`. The agent must call `.with_tools()` so the Engine-level
-`enable_tools` flag is true.
+`OpenAI.tools` and `OpenAIRealtime.tools` accept the same list of dictionaries
+with `function` and `server` fields. The server method is `GET` or `POST`; the
+only execution mode currently supported is `sync`. Both paths must call
+`.with_tools()` so the Engine-level `enable_tools` flag is true. Pipeline is the
+default and optionally supports `OPENAI_API_KEY` / `OPENAI_BASE_URL`; Realtime
+requires the separate `OPENAI_REALTIME_API_KEY`.
 
 Keep the tool schema and URL/body templates aligned with the SDK source. Do not
 invent MCP transports or an OpenAI-compatible `/chat/completions` endpoint in
 this recipe.
 
 Before submitting Recipe changes, use a formally released `agora-agents`
-version whose AgentKit `OpenAI` vendor accepts and serializes `tools`. Source
-dependencies are for local development only and must not be submitted.
+version whose AgentKit vendors accept and serialize these tools on both LLM and
+MLLM paths. Source dependencies are for local development only and must not be
+submitted.
 
 ## Security
 

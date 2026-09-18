@@ -5,14 +5,14 @@
 [![Bun](https://img.shields.io/badge/bun-latest-black)](https://bun.sh/)
 
 The **custom HTTP tools** recipe in the Agora Conversational AI recipes family.
-It demonstrates Engine's inline LLM REST tools capability: a managed OpenAI
+It demonstrates Engine's inline LLM REST tools capability: the selected OpenAI
 model selects a function, and Agora Engine calls the HTTP endpoint declared
 directly in that function's SDK configuration. The JSON result is returned to
-the LLM, which speaks a natural response.
+the model, which speaks a natural response.
 
-This capability is separate from MCP: it uses inline `OpenAI.tools` definitions,
-not `mcp_servers` or an MCP transport. It is also separate from a custom LLM
-tool loop because Agora Engine executes the REST request.
+This capability is separate from MCP: it uses inline `tools` definitions on the
+OpenAI LLM or Realtime MLLM, not `mcp_servers` or an MCP transport. It is also
+separate from a custom LLM tool loop because Agora Engine executes the request.
 
 The recipe includes three deterministic mock business endpoints:
 
@@ -20,10 +20,16 @@ The recipe includes three deterministic mock business endpoints:
 - `POST /tools/tickets` — create and store a support ticket
 - `GET /tools/tickets/{ticket_id}` — retrieve a created ticket
 
-**Pipeline:** `DeepgramSTT(nova-3, en)` → `OpenAI(gpt-4o-mini, inline tools)` → `MiniMaxTTS`
+Choose the agent mode before each conversation:
 
-No external model API key is required. `HTTP_TOOLS_API_KEY` is a random shared
-secret for authenticating Engine requests to the example tool endpoints.
+- **Pipeline** (default): `DeepgramSTT(nova-3, en)` → `OpenAI(gpt-4o-mini, inline tools)` → `MiniMaxTTS`
+- **Realtime**: `OpenAI Realtime MLLM(inline tools)`
+
+Pipeline mode requires no external model API key by default. Set
+`OPENAI_API_KEY` to use your own OpenAI credentials, and optionally override
+`OPENAI_BASE_URL` for a compatible endpoint. Realtime mode uses the separate
+`OPENAI_REALTIME_API_KEY`. `HTTP_TOOLS_API_KEY` is a random shared secret for
+authenticating Engine requests to the example tool endpoints.
 
 ## Prerequisites
 
@@ -103,7 +109,11 @@ Backend env file: [`server/.env.example`](server/.env.example).
 | `HTTP_TOOLS_BASE_URL` | Yes | — | Public HTTPS base URL for this server, without `/tools` |
 | `HTTP_TOOLS_API_KEY` | Yes | — | Random shared secret sent as `X-Tool-API-Key` |
 | `HTTP_TOOLS_TIMEOUT_MS` | | `10000` | SDK-supported range: 1000–100000 ms |
-| `OPENAI_MODEL` | | `gpt-4o-mini` | Agora-managed OpenAI model |
+| `OPENAI_MODEL` | | `gpt-4o-mini` | Pipeline model |
+| `OPENAI_API_KEY` | | — | Optional Pipeline BYO API key; omit for Agora-managed mode |
+| `OPENAI_BASE_URL` | | OpenAI chat completions URL | Optional OpenAI-compatible Pipeline endpoint override |
+| `OPENAI_REALTIME_API_KEY` | Realtime only | — | OpenAI API key for Realtime mode |
+| `OPENAI_REALTIME_MODEL` | | `gpt-realtime` | OpenAI Realtime model |
 | `AGENT_GREETING` | | built-in | Optional opening line override |
 | `PORT` | | `8000` | FastAPI backend port |
 | `AGENT_BACKEND_URL` | web deploy only | — | Backend URL used by deployed Next.js `/api/*` rewrites |
@@ -168,6 +178,11 @@ llm = OpenAI(
 agent = Agent(client=client).with_llm(llm).with_tools()
 ```
 
+The same tool list can be passed to `OpenAIRealtime(tools=...)` and attached
+with `.with_mllm(...).with_tools()`. The example uses a literal `requester`
+value in Realtime mode because `OpenAIRealtime` has no `template_variables`
+configuration field; Pipeline mode demonstrates the template variable instead.
+
 URLs and POST bodies support `{{args.name}}`,
 `{{template_variables.name}}`, and `{{tool_call_id}}`. Headers support constants,
 template variables, and the tool call ID, but not `args` placeholders. The
@@ -180,7 +195,7 @@ Browser (localhost:3000)
   │  fetch /api/*
   ▼
 Next.js  ──rewrite──▶  Agent backend (server/, localhost:8000)
-                          │  starts session with OpenAI.tools + with_tools()
+                          │  starts selected OpenAI path with tools + with_tools()
                           ▼
                        Agora ConvoAI Engine
                           │  model selects a function
@@ -189,7 +204,7 @@ Next.js  ──rewrite──▶  Agent backend (server/, localhost:8000)
                        Public HTTPS /tools endpoint
                           │  authenticated JSON result
                           ▼
-                       Engine → LLM → MiniMax TTS → RTC user
+                       Engine → selected model path → RTC user
 ```
 
 The browser does not execute tools. Agora Engine calls
@@ -201,21 +216,22 @@ cloud session. See [ARCHITECTURE.md](./ARCHITECTURE.md).
 - A **Next.js** web client (:3000) that drives the RTC/RTM lifecycle and only calls `/api/*`.
 - A **FastAPI** backend (:8000) that owns Agora token generation, agent sessions, and the mock REST endpoints.
 - The standard `/api/get_config` · `/api/startAgent` · `/api/stopAgent` contract through Next rewrites.
-- Managed **Deepgram STT**, **OpenAI LLM**, and **MiniMax TTS** with no external model API key.
+- Selectable Pipeline and OpenAI Realtime MLLM paths using the same inline REST tools.
 - Three authenticated inline REST tools covering GET URL arguments, POST bodies, template variables, and tool call IDs.
 
 ## How It Works
 
 1. The browser calls `/api/get_config`; Next rewrites the request to FastAPI,
    which mints an Agora token from the App ID and App Certificate.
-2. The browser joins RTC, then calls `/api/startAgent`. The backend starts an
-   SDK session with managed OpenAI, the inline tool definitions, and
-   `enable_tools`.
-3. The user speaks. Agora runs Deepgram STT and sends the transcript to the LLM.
-4. When the LLM selects a function, Engine renders the tool templates and calls
+2. The browser joins RTC, then calls `/api/startAgent` with `agentMode`. The
+   backend attaches the same inline tool definitions to managed OpenAI in
+   Pipeline mode or OpenAI Realtime MLLM in Realtime mode, then enables tools.
+3. In Pipeline mode, Agora runs Deepgram STT before the LLM and MiniMax TTS
+   after it. Realtime mode handles audio directly in the MLLM.
+4. When the model selects a function, Engine renders the tool templates and calls
    the configured public HTTPS endpoint with `X-Tool-API-Key`.
-5. Engine returns the endpoint's JSON to the LLM. MiniMax TTS speaks the final
-   response in the RTC channel.
+5. Engine returns the endpoint's JSON to the model. Pipeline mode uses MiniMax
+   TTS for the final response; Realtime mode speaks it directly.
 6. The demo backend keeps created tickets in process so the user can ask for a
    returned ticket ID and retrieve the same ticket. Restarting the backend clears them.
 7. `/api/stopAgent` stops the active session, with the SDK's stateless stop path

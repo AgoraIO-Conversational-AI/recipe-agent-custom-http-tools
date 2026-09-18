@@ -53,8 +53,9 @@ def test_start_agent_calls_agent_and_returns_shape(client):
         "agent_id": "fake-agent-111",
         "channel_name": "ch",
         "status": "started",
+        "agent_mode": "pipeline",
     }
-    assert client.fake_agent.started == [("ch", 111, 222, None)]
+    assert client.fake_agent.started == [("ch", 111, 222, None, "pipeline")]
 
 
 def test_start_agent_forwards_output_audio_codec(client):
@@ -67,7 +68,37 @@ def test_start_agent_forwards_output_audio_codec(client):
             "parameters": {"output_audio_codec": "opus"},
         },
     )
-    assert client.fake_agent.started[-1] == ("ch", 111, 222, "opus")
+    assert client.fake_agent.started[-1] == ("ch", 111, 222, "opus", "pipeline")
+
+
+def test_start_agent_forwards_realtime_mode(client):
+    response = client.post(
+        "/startAgent",
+        json={
+            "channelName": "ch",
+            "rtcUid": 111,
+            "userUid": 222,
+            "agentMode": "realtime",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["agent_mode"] == "realtime"
+    assert client.fake_agent.started[-1] == ("ch", 111, 222, None, "realtime")
+
+
+def test_start_agent_rejects_unknown_mode(client):
+    response = client.post(
+        "/startAgent",
+        json={
+            "channelName": "ch",
+            "rtcUid": 111,
+            "userUid": 222,
+            "agentMode": "unknown",
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def test_stop_agent(client):
