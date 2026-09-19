@@ -10,7 +10,11 @@ import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { QuickstartPreCallCard } from "@/components/QuickstartPreCallCard";
 import { ShareButton } from "@/components/share-button";
 import { getConfig, startAgent, stopAgent } from "@/services/api";
-import type { AgoraRenewalTokens, AgoraTokenData } from "@/types/conversation";
+import type {
+	AgentMode,
+	AgoraRenewalTokens,
+	AgoraTokenData,
+} from "@/types/conversation";
 
 const ConversationComponent = dynamic(
 	() => import("@/components/ConversationComponent"),
@@ -93,6 +97,7 @@ export default function LandingPage() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [agentJoinError, setAgentJoinError] = useState(false);
+	const [agentMode, setAgentMode] = useState<AgentMode>("pipeline");
 
 	useEffect(() => {
 		import("agora-rtc-react").catch(() => {});
@@ -113,6 +118,7 @@ export default function LandingPage() {
 					config.channel_name,
 					Number(config.agent_uid),
 					Number(config.uid),
+					agentMode,
 				).catch((err) => {
 					console.error("Failed to start conversation with agent:", err);
 					setAgentJoinError(true);
@@ -208,6 +214,8 @@ export default function LandingPage() {
 						<QuickstartPreCallCard
 							isLoading={isLoading}
 							error={error}
+							agentMode={agentMode}
+							onAgentModeChange={setAgentMode}
 							onStartConversation={handleStartConversation}
 						/>
 					) : agoraData && rtmClient ? (
@@ -223,6 +231,7 @@ export default function LandingPage() {
 									<AgoraProvider>
 										<ConversationComponent
 											agoraData={agoraData}
+											agentMode={agentMode}
 											rtmClient={rtmClient}
 											onTokenWillExpire={handleTokenWillExpire}
 											onEndConversation={handleEndConversation}

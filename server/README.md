@@ -7,12 +7,14 @@ the Next.js `/api/*` rewrite proxy on port 8000. It also serves the example
 
 ## What's different from the base quickstart
 
-The managed `OpenAI` LLM includes inline function definitions with `server`
-configuration. When the model selects a function, Agora Engine renders the
-configured templates and sends the HTTP request. This is separate from MCP:
-there is no `mcp_servers` configuration or MCP transport.
+The same inline function definitions with `server` configuration can be attached
+to the managed `OpenAI` LLM or an `OpenAIRealtime` MLLM. When the model selects a
+function, Agora Engine renders the configured templates and sends the HTTP
+request. This is separate from MCP: there is no `mcp_servers` configuration or
+MCP transport.
 
-**Pipeline:** `DeepgramSTT(nova-3, en)` → `OpenAI(gpt-4o-mini, inline tools)` → `MiniMaxTTS`
+- **Pipeline** (default): `DeepgramSTT` → `OpenAI(inline tools)` → `MiniMaxTTS`
+- **Realtime**: `OpenAIRealtime(inline tools)`
 
 `src/http_tools.py` provides deterministic mock endpoints for order lookup and
 a create-then-query support ticket flow. Tickets are kept in the current backend
@@ -45,14 +47,18 @@ Optional:
 | Variable | Default | Notes |
 | --- | :---: | --- |
 | `HTTP_TOOLS_TIMEOUT_MS` | `10000` | SDK-supported range: 1000–100000 ms |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Agora-managed OpenAI model |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Pipeline model |
+| `OPENAI_API_KEY` | — | Optional Pipeline BYO API key; omit for Agora-managed mode |
+| `OPENAI_BASE_URL` | OpenAI chat completions URL | OpenAI-compatible Pipeline endpoint used with a BYO key |
+| `OPENAI_REALTIME_API_KEY` | — | Required only for Realtime mode |
+| `OPENAI_REALTIME_MODEL` | `gpt-realtime` | OpenAI Realtime model |
 | `AGENT_GREETING` | built-in | Optional opening line override |
 | `PORT` | `8000` | Backend port |
 
 ## API
 
 - `GET /get_config` — token + channel/UID config
-- `POST /startAgent` — start an agent session with inline REST tools
+- `POST /startAgent` — start an agent session; `agentMode` is `pipeline` or `realtime`
 - `POST /stopAgent` — stop an agent session
 - `GET /tools/health` — tool endpoint health check
 - `GET /tools/orders/{order_id}` — deterministic order lookup
@@ -70,7 +76,7 @@ authentication, and session stop behavior. None starts a live Agora session.
 | File | Purpose |
 | --- | --- |
 | `src/server.py` | FastAPI app, lifecycle routes, and token generation |
-| `src/agent.py` | Agent SDK pipeline, inline tools, and session lifecycle |
+| `src/agent.py` | Pipeline/Realtime agent modes, inline tools, and session lifecycle |
 | `src/http_tools.py` | Inline tool dictionaries and mock `/tools` handlers |
 | `scripts/run_fake_server.py` | Deterministic lifecycle server for proxy tests |
 | `tests/` | Backend contract and lifecycle tests |

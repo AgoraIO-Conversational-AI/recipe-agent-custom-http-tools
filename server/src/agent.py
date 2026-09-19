@@ -4,12 +4,17 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 import httpx
 from agora_agent import Area, AsyncAgora
 from agora_agent.agentkit import Agent as AgoraAgent
-from agora_agent.agentkit.vendors import DeepgramSTT, MiniMaxTTS, OpenAI
+from agora_agent.agentkit.vendors import (
+    DeepgramSTT,
+    MiniMaxTTS,
+    OpenAI,
+    OpenAIRealtime,
+)
 
 from http_tools import build_inline_tools
 
@@ -117,13 +122,17 @@ Ticket IDs use the format T-1234. When saying a ticket ID, say the letter T,
 then read each digit separately.
 """
 
+AgentMode = Literal["pipeline", "realtime"]
+DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1/chat/completions"
+TOOL_REQUESTER = "inline-rest-tools-recipe"
+
 
 class Agent:
     """High-level wrapper around the Agora Agent SDK.
 
-    The tools are declared on the managed OpenAI LLM and executed synchronously
-    by Agora Engine. The Engine, rather than the browser, calls the public REST
-    endpoint configured by ``HTTP_TOOLS_BASE_URL``.
+    The tools are declared on the selected OpenAI LLM or Realtime MLLM and
+    executed synchronously by Agora Engine. The Engine, rather than the browser,
+    calls the public REST endpoint configured by ``HTTP_TOOLS_BASE_URL``.
     """
 
     def __init__(self):
@@ -134,6 +143,12 @@ class Agent:
             "Hi! I can look up an order or create a support ticket for you.",
         )
         self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.openai_base_url = os.getenv("OPENAI_BASE_URL")
+        self.openai_realtime_api_key = os.getenv("OPENAI_REALTIME_API_KEY")
+        self.openai_realtime_model = os.getenv(
+            "OPENAI_REALTIME_MODEL", "gpt-realtime"
+        )
         self.http_tools_base_url = os.getenv("HTTP_TOOLS_BASE_URL")
         self.http_tools_api_key = os.getenv("HTTP_TOOLS_API_KEY")
         self.http_tools_timeout_ms = int(os.getenv("HTTP_TOOLS_TIMEOUT_MS", "10000"))
@@ -171,34 +186,29 @@ class Agent:
         agent_uid: int,
         user_uid: int,
         output_audio_codec: Optional[str] = None,
+        agent_mode: AgentMode = "pipeline",
     ) -> Dict[str, Any]:
-        """Start an agent with managed OpenAI and inline REST tools."""
+        """Start a Pipeline or Realtime agent with inline REST tools."""
         if not channel_name or not str(channel_name).strip():
             raise ValueError("channel_name is required and cannot be empty")
         if agent_uid <= 0:
             raise ValueError("agent_uid is required and cannot be empty")
         if user_uid <= 0:
             raise ValueError("user_uid is required and cannot be empty")
+        if agent_mode not in ("pipeline", "realtime"):
+            raise ValueError("agent_mode must be 'pipeline' or 'realtime'")
+        if agent_mode == "realtime" and not self.openai_realtime_api_key:
+            raise ValueError("OPENAI_REALTIME_API_KEY is required for realtime mode")
 
-        llm = OpenAI(
-            model=self.openai_model,
-            system_messages=[{"role": "system", "content": AGENT_INSTRUCTIONS}],
-            greeting_message=self.greeting,
-            max_history=15,
-            max_tokens=1024,
-            temperature=0.2,
-            tools=build_inline_tools(
-                self.http_tools_base_url,
-                self.http_tools_api_key,
-                timeout_ms=self.http_tools_timeout_ms,
+        tools = build_inline_tools(
+            self.http_tools_base_url,
+            self.http_tools_api_key,
+            timeout_ms=self.http_tools_timeout_ms,
+            # OpenAIRealtime has no template_variables configuration field.
+            requester=(
+                TOOL_REQUESTER if agent_mode == "realtime"
+                else "{{template_variables.requester}}"
             ),
-            template_variables={"requester": "inline-rest-tools-recipe"},
-        )
-
-        stt = DeepgramSTT(model="nova-3", language="en")
-        tts = MiniMaxTTS(
-            model="speech_2_6_turbo",
-            voice_id="English_captivating_female1",
         )
 
         parameters = {
@@ -210,13 +220,17 @@ class Agent:
         if isinstance(output_audio_codec, str) and output_audio_codec.strip():
             parameters["output_audio_codec"] = output_audio_codec.strip()
 
-        agora_agent = AgoraAgent(
-            client=self.client,
-            instructions=AGENT_INSTRUCTIONS,
-            greeting=self.greeting,
-            failure_message="Please wait a moment.",
-            max_history=50,
-            turn_detection={
+        agent_options = {
+            "client": self.client,
+            "greeting": self.greeting,
+            "failure_message": "Please wait a moment.",
+            "max_history": 50,
+            "advanced_features": {"enable_rtm": True},
+            "parameters": parameters,
+        }
+        if agent_mode == "pipeline":
+            agent_options["instructions"] = AGENT_INSTRUCTIONS
+            agent_options["turn_detection"] = {
                 "config": {
                     "speech_threshold": 0.5,
                     "start_of_speech": {
@@ -231,16 +245,47 @@ class Agent:
                         "vad_config": {"silence_duration_ms": 480},
                     },
                 },
-            },
-            advanced_features={"enable_rtm": True},
-            parameters=parameters,
-        )
+            }
+        agora_agent = AgoraAgent(**agent_options)
 
         # with_tools() is required in addition to LLM.tools. It sets the
         # Engine-level enable_tools flag that permits tool execution.
-        agora_agent = (
-            agora_agent.with_stt(stt).with_llm(llm).with_tts(tts).with_tools()
-        )
+        if agent_mode == "pipeline":
+            llm_options = {
+                "model": self.openai_model,
+                "system_messages": [{"role": "system", "content": AGENT_INSTRUCTIONS}],
+                "greeting_message": self.greeting,
+                "max_history": 15,
+                "max_tokens": 1024,
+                "temperature": 0.2,
+                "tools": tools,
+                "template_variables": {"requester": TOOL_REQUESTER},
+            }
+            if self.openai_api_key:
+                llm_options["api_key"] = self.openai_api_key
+                llm_options["base_url"] = (
+                    self.openai_base_url or DEFAULT_OPENAI_BASE_URL
+                )
+            llm = OpenAI(**llm_options)
+            stt = DeepgramSTT(model="nova-3", language="en")
+            tts = MiniMaxTTS(
+                model="speech_2_6_turbo",
+                voice_id="English_captivating_female1",
+            )
+            agora_agent = (
+                agora_agent.with_stt(stt).with_llm(llm).with_tts(tts).with_tools()
+            )
+        else:
+            mllm = OpenAIRealtime(
+                api_key=self.openai_realtime_api_key,
+                model=self.openai_realtime_model,
+                instructions=AGENT_INSTRUCTIONS,
+                greeting_message=self.greeting,
+                failure_message="Please wait a moment.",
+                turn_detection={"mode": "server_vad"},
+                tools=tools,
+            )
+            agora_agent = agora_agent.with_mllm(mllm).with_tools()
 
         session = agora_agent.create_async_session(
             channel=channel_name,
@@ -252,10 +297,11 @@ class Agent:
         )
 
         logger.info(
-            "Starting inline REST tools agent channel=%s agent_uid=%s user_uid=%s tools_base=%s",
+            "Starting inline REST tools agent channel=%s agent_uid=%s user_uid=%s mode=%s tools_base=%s",
             channel_name,
             agent_uid,
             user_uid,
+            agent_mode,
             self.http_tools_base_url,
         )
         try:
@@ -270,7 +316,12 @@ class Agent:
             raise
 
         self._sessions[agent_id] = session
-        return {"agent_id": agent_id, "channel_name": channel_name, "status": "started"}
+        return {
+            "agent_id": agent_id,
+            "channel_name": channel_name,
+            "status": "started",
+            "agent_mode": agent_mode,
+        }
 
     async def stop(self, agent_id: str) -> None:
         """Stop a running agent, falling back to the stateless SDK path."""

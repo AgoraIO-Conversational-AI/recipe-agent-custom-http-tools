@@ -1,5 +1,7 @@
 import type { RTMClient } from 'agora-rtm';
 
+export type AgentMode = 'pipeline' | 'realtime';
+
 /** Session bootstrap from GET /api/get_config (channel + tokens + agent identity). */
 export interface AgoraTokenData {
   token: string;
@@ -17,6 +19,7 @@ export interface AgoraRenewalTokens {
 
 export interface ConversationComponentProps {
   agoraData: AgoraTokenData;
+  agentMode: AgentMode;
   rtmClient: RTMClient;
   onTokenWillExpire: (uid: string) => Promise<AgoraRenewalTokens>;
   onEndConversation: () => void;

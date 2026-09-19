@@ -132,6 +132,7 @@ async function verifyApiClientRequests() {
       assert(body.channelName === 'test-channel', 'POST /api/startAgent should include channelName')
       assert(body.rtcUid === 9999, 'POST /api/startAgent should include rtcUid')
       assert(body.userUid === 1234, 'POST /api/startAgent should include userUid')
+      assert(body.agentMode === 'realtime', 'POST /api/startAgent should include agentMode')
 
       return Response.json({
         code: 0,
@@ -158,7 +159,7 @@ async function verifyApiClientRequests() {
     const config = await getConfig({ uid: 1234, channel: 'test-channel' })
     assert(config.token === 'stub-token', 'GET /api/get_config should return response data')
 
-    const agentId = await startAgent('test-channel', 9999, 1234)
+    const agentId = await startAgent('test-channel', 9999, 1234, 'realtime')
     assert(agentId === 'mock-agent-id', 'POST /api/startAgent should return the agent id')
 
     await stopAgent(agentId)

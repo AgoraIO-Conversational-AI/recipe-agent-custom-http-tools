@@ -39,7 +39,7 @@
   - `agora-agent-client-toolkit` and `agora-agent-uikit` for transcript, state, metrics, and visualizer UI
 - Backend service:
   - Python FastAPI owns token generation and agent lifecycle through `agora-agents`
-- Third-party services: Agora Conversational AI managed STT/LLM/TTS pipeline plus the public REST tool endpoint configured by `HTTP_TOOLS_BASE_URL`
+- Third-party services: Agora Conversational AI managed Pipeline or OpenAI Realtime MLLM, plus the public REST tool endpoint configured by `HTTP_TOOLS_BASE_URL`
 
 ## 5. Module Responsibilities & Directory Structure
 
@@ -63,7 +63,7 @@ web/
 - Data flow:
   1. `LandingPage` calls `GET /api/get_config`
   2. Next rewrites to FastAPI `/get_config`
-  3. Browser starts the agent via `POST /api/startAgent`, logs into RTM, and renders `ConversationComponent`
+  3. Browser sends the selected `agentMode` (`pipeline` or `realtime`) via `POST /api/startAgent`, logs into RTM, and renders `ConversationComponent`
   4. `ConversationComponent` joins RTC, initializes `AgoraVoiceAI`, publishes the microphone, and renders transcript/state/metrics
   5. End call posts `/api/stopAgent`, logs out of RTM, and clears browser state
 - Error handling: `ErrorBoundary`, `ConnectionStatusPanel`, and issue aggregation in `ConversationComponent`
